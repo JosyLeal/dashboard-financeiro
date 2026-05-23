@@ -1,0 +1,94 @@
+.hero-exemplo {
+  background: linear-gradient(135deg, rgba(91, 141, 239, 0.14), rgba(61, 214, 181, 0.08));
+}
+
+.demo-badge {
+  display: inline-block;
+  background: rgba(91, 141, 239, 0.18);
+  border: 1px solid rgba(91, 141, 239, 0.35);
+  color: var(--accent-2);
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.kpi-grid {
+  margin-top: 20px;
+}
+
+.kpi-card .kpi-value.positive {
+  color: var(--success);
+}
+
+.kpi-card .kpi-value.negative {
+  color: var(--danger);
+}
+
+.kpi-card .kpi-value.neutral {
+  color: var(--accent-2);
+}
+
+.summary-exemplo {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+@media (max-width: 1100px) {
+  .summary-exemplo {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .summary-exemplo {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.tag-essencial {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.tag-essencial.sim {
+  background: rgba(76, 175, 135, 0.18);
+  color: var(--success);
+}
+
+.tag-essencial.nao {
+  background: rgba(245, 166, 35, 0.18);
+  color: var(--warning);
+}
+
+.tag-tipo {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.tag-tipo.saida {
+  background: rgba(239, 83, 80, 0.15);
+  color: var(--danger);
+}
+
+.tag-tipo.entrada {
+  background: rgba(76, 175, 135, 0.15);
+  color: var(--success);
+}
+
+footer a {
+  color: var(--accent-2);
+  text-decoration: none;
+}
+
+footer a:hover {
+  text-decoration: underline;
+}

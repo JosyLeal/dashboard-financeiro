@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard Financeiro — Base de Estudo</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/styles-exemplo.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header class="hero hero-exemplo">
+      <div class="hero-top">
+        <div>
+          <p class="demo-badge">Dados fictícios · uso educacional</p>
+          <h1>Dashboard Financeiro — Base de Estudo</h1>
+          <p>
+            Análise interativa da planilha <strong>Controle_gastos_Exemplo.xlsx</strong>.
+            Acompanhe receitas e despesas, filtre por <em>Centro de custo</em> e
+            <em>Essencial</em>, e compare com a meta mensal de R$ 3.500.
+          </p>
+        </div>
+        <div class="goal-badge">Meta: R$ 3.500/mês em despesas</div>
+      </div>
+      <div class="controls" id="filtersContainer"></div>
+    </header>
+
+    <section class="summary-strip summary-exemplo" id="summaryStrip"></section>
+
+    <section class="grid grid-3 kpi-grid">
+      <article class="card kpi-card" id="cardDespesas"></article>
+      <article class="card kpi-card" id="cardReceitas"></article>
+      <article class="card kpi-card" id="cardSaldo"></article>
+    </section>
+
+    <article class="card" style="margin: 20px 0">
+      <h2>Diagnóstico do mês</h2>
+      <div class="insight-box" id="insightBox"></div>
+      <div class="legend">
+        <span><i class="dot" style="background: var(--success)"></i> Na meta (≤ R$ 3.500)</span>
+        <span><i class="dot" style="background: var(--warning)"></i> Atenção (R$ 3.500 – R$ 4.500)</span>
+        <span><i class="dot" style="background: var(--danger)"></i> Crítico (&gt; R$ 4.500)</span>
+        <span><i class="dot" style="background: var(--accent)"></i> Receitas</span>
+        <span><i class="dot" style="background: var(--accent-2)"></i> Despesas</span>
+      </div>
+    </article>
+
+    <section class="grid grid-2" style="margin-bottom: 20px">
+      <article class="card">
+        <h2>Despesas por Classificação2</h2>
+        <p class="subtitle">Principais categorias de gasto no mês selecionado</p>
+        <div class="chart-box lg">
+          <canvas id="categoryChart"></canvas>
+        </div>
+      </article>
+      <article class="card">
+        <h2>Participação por categoria</h2>
+        <p class="subtitle">Distribuição percentual das despesas</p>
+        <div class="chart-box lg">
+          <canvas id="categoryPieChart"></canvas>
+        </div>
+      </article>
+    </section>
+
+    <section class="grid grid-2" style="margin-bottom: 20px">
+      <article class="card">
+        <h2>Despesas por Centro de custo</h2>
+        <p class="subtitle">Quanto cada área consome no orçamento</p>
+        <div class="chart-box">
+          <canvas id="centroChart"></canvas>
+        </div>
+      </article>
+      <article class="card">
+        <h2>Essencial vs Não essencial</h2>
+        <p class="subtitle">Proporção de gastos indispensáveis</p>
+        <div class="chart-box">
+          <canvas id="essencialChart"></canvas>
+        </div>
+      </article>
+    </section>
+
+    <section class="grid grid-2" style="margin-bottom: 20px">
+      <article class="card">
+        <h2>Receitas vs Despesas</h2>
+        <p class="subtitle">Evolução mensal do fluxo de caixa</p>
+        <div class="chart-box">
+          <canvas id="cashflowChart"></canvas>
+        </div>
+      </article>
+      <article class="card">
+        <h2>Despesas vs meta mensal</h2>
+        <p class="subtitle">Linha tracejada = teto de R$ 3.500/mês</p>
+        <div class="chart-box">
+          <canvas id="goalChart"></canvas>
+        </div>
+      </article>
+    </section>
+
+    <section class="grid grid-2" style="margin-bottom: 20px">
+      <article class="card">
+        <h2>Despesas por forma de pagamento</h2>
+        <p class="subtitle">Crédito, débito, Pix e dinheiro</p>
+        <div class="chart-box sm">
+          <canvas id="formaChart"></canvas>
+        </div>
+      </article>
+      <article class="card">
+        <h2>Oportunidades de redução</h2>
+        <p class="subtitle">Gastos não essenciais e categorias ajustáveis</p>
+        <div class="opportunity-list" id="opportunityList"></div>
+      </article>
+    </section>
+
+    <article class="card" style="margin-bottom: 20px">
+      <h2>Detalhamento por Classificação2</h2>
+      <p class="subtitle">Valores e percentuais no mês filtrado</p>
+      <div class="table-wrap">
+        <table id="catTable">
+          <thead>
+            <tr>
+              <th>Classificação2</th>
+              <th>Classificação1</th>
+              <th>Valor</th>
+              <th>% do mês</th>
+              <th>Essencial</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="card">
+      <h2>Maiores lançamentos filtrados</h2>
+      <p class="subtitle">Top 15 movimentações conforme filtros ativos</p>
+      <div class="table-wrap">
+        <table id="txTable">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Tipo</th>
+              <th>Forma</th>
+              <th>Banco</th>
+              <th>Lançamento</th>
+              <th>Centro de custo</th>
+              <th>Classificação2</th>
+              <th>Valor</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </article>
+
+    <footer>
+      Fonte: Controle_gastos_Exemplo.xlsx · Dados fictícios para estudo ·
+      <a href="index.html">Dashboard do casal (Josy &amp; Nill)</a>
+    </footer>
+  </div>
+
+  <script src="js/data-exemplo.js"></script>
+  <script src="js/app-exemplo.js"></script>
+</body>
+</html>
