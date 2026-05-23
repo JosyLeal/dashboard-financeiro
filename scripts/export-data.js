@@ -159,8 +159,8 @@ const meta = {
   objetivoPorPessoa: 500,
   objetivoCasal: 1000,
   pessoas: {
-    Josy: { label: "Josy", cor: "#ec7000" },
-    Nill: { label: "Nill", cor: "#8a05be" },
+    Josy: { label: "Josy", cor: "#00e5ff" },
+    Nill: { label: "Nill", cor: "#007bff" },
   },
   fontes: FILES.map((f) => f.file),
   colunas: [

@@ -6,44 +6,41 @@
   <title>Dashboard Financeiro — Josy & Nill</title>
   <link rel="stylesheet" href="css/styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 </head>
 <body>
   <div class="container">
-    <header class="hero">
-      <div class="hero-top">
+    <header class="hero hero-compact">
+      <div class="hero-row">
         <div>
           <h1>Controle Financeiro do Casal</h1>
-          <p>
-            Acompanhe os gastos de <strong>Josy</strong> (<em>Controle_gastos_Josy.xlsx</em>) e
-            <strong>Nill</strong> (<em>Controle_gastos_Nill.xlsx</em>), identifique as maiores despesas por
-            <em>Classificação2</em> e veja o quanto falta para a meta de R$ 500/mês por pessoa no cartão.
-          </p>
+          <p class="hero-tagline">Josy & Nill · cartão · meta 500/pessoa · Classificação2</p>
         </div>
-        <div class="goal-badge">Meta: R$ 500/mês por pessoa no cartão</div>
+        <div class="goal-badge">Meta 500/pessoa</div>
       </div>
       <div class="controls" id="filtersContainer"></div>
     </header>
 
-    <section class="summary-strip" id="summaryStrip"></section>
-
-    <section class="grid grid-2 person-cards" id="personCards" style="margin-bottom: 20px">
-      <article class="card" id="cardJosy"></article>
-      <article class="card" id="cardNill"></article>
+    <section class="overview">
+      <div class="overview-stats" id="summaryStrip"></div>
+      <div class="overview-grid person-cards" id="personCards">
+        <article class="card card-kpi" id="cardJosy"></article>
+        <article class="card card-kpi" id="cardNill"></article>
+        <article class="card card-insight">
+          <h2 class="card-title-sm">Diagnóstico do mês</h2>
+          <div class="insight-box" id="insightBox"></div>
+          <div class="legend legend-compact">
+            <span><i class="dot" style="background: var(--success)"></i> <span class="status-emoji">✅</span> Na meta</span>
+            <span><i class="dot" style="background: var(--warning)"></i> <span class="status-emoji">⚠️</span> Atenção</span>
+            <span><i class="dot" style="background: var(--danger)"></i> <span class="status-emoji">🚨</span> Crítico</span>
+            <span><i class="dot" style="background: var(--josy)"></i> Josy</span>
+            <span><i class="dot" style="background: var(--nill)"></i> Nill</span>
+          </div>
+        </article>
+      </div>
     </section>
 
-    <article class="card" style="margin-bottom: 20px">
-      <h2>Diagnóstico do mês</h2>
-      <div class="insight-box" id="insightBox"></div>
-      <div class="legend">
-        <span><i class="dot" style="background: var(--success)"></i> Na meta (≤ R$ 500)</span>
-        <span><i class="dot" style="background: var(--warning)"></i> Atenção (R$ 500 – R$ 750)</span>
-        <span><i class="dot" style="background: var(--danger)"></i> Crítico (&gt; R$ 750)</span>
-        <span><i class="dot" style="background: var(--josy)"></i> Josy</span>
-        <span><i class="dot" style="background: var(--nill)"></i> Nill</span>
-      </div>
-    </article>
-
-    <section class="grid grid-2" style="margin-bottom: 20px">
+    <section class="grid grid-2 section-charts" style="margin-bottom: 16px">
       <article class="card">
         <h2>Maiores despesas do casal por Classificação2</h2>
         <p class="subtitle">Comparativo empilhado: quanto cada pessoa gastou em cada categoria</p>
@@ -53,67 +50,30 @@
       </article>
       <article class="card">
         <h2>Participação no total do casal</h2>
-        <p class="subtitle">Top categorias (Classificação2) no mês selecionado</p>
+        <p class="subtitle">Quanto cada pessoa representa no total filtrado do mês</p>
         <div class="chart-box lg">
           <canvas id="personSplitChart"></canvas>
         </div>
       </article>
     </section>
 
-    <article class="card" style="margin-bottom: 20px">
-      <h2>Detalhamento por Classificação2 e pessoa</h2>
-      <p class="subtitle">Maiores categorias de gasto no cartão — Josy, Nill e total do casal</p>
-      <div class="table-wrap">
-        <table id="catTable">
-          <thead>
-            <tr>
-              <th>Classificação2</th>
-              <th>Josy</th>
-              <th>Nill</th>
-              <th>Total casal</th>
-              <th>% do mês</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+    <article class="card" style="margin-bottom: 16px">
+      <h2>Casal vs meta</h2>
+      <p class="subtitle">Linha de gasto real do casal vs meta mensal de 1.000</p>
+      <div class="chart-box">
+        <canvas id="coupleChart"></canvas>
       </div>
     </article>
 
-    <section class="grid grid-2" style="margin-bottom: 20px">
-      <article class="card">
-        <h2>Evolução mensal por pessoa</h2>
-        <p class="subtitle">Linha tracejada verde = meta individual · azul = meta do casal (R$ 1.000)</p>
-        <div class="chart-box">
-          <canvas id="trendChart"></canvas>
-        </div>
-      </article>
-      <article class="card">
-        <h2>Casal vs meta</h2>
-        <p class="subtitle">Soma Josy + Nill comparada ao teto de R$ 1.000/mês</p>
-        <div class="chart-box">
-          <canvas id="coupleChart"></canvas>
-        </div>
-      </article>
-    </section>
-
-    <section class="grid grid-2" style="margin-bottom: 20px">
-      <article class="card">
-        <h2>Top categorias do casal</h2>
-        <p class="subtitle">Soma de Josy + Nill por Classificação2</p>
-        <div class="chart-box sm">
-          <canvas id="categoryChart"></canvas>
-        </div>
-      </article>
-      <article class="card">
-        <h2>Oportunidades de redução</h2>
-        <p class="subtitle">Categorias ajustáveis para aproximar da meta de R$ 500/pessoa</p>
-        <div class="opportunity-list" id="opportunityList"></div>
-      </article>
-    </section>
+    <article class="card" style="margin-bottom: 16px">
+      <h2>Oportunidades de redução</h2>
+      <p class="subtitle">Categorias ajustáveis para aproximar da meta de 500/pessoa</p>
+      <div class="opportunity-list" id="opportunityList"></div>
+    </article>
 
     <article class="card">
-      <h2>Maiores lançamentos filtrados</h2>
-      <p class="subtitle">Top 15 despesas conforme filtros das colunas da planilha</p>
+      <h2>Lançamentos filtrados</h2>
+      <p class="subtitle">Todos os lançamentos conforme filtros ativos</p>
       <div class="table-wrap">
         <table id="txTable">
           <thead>
@@ -122,8 +82,9 @@
               <th>Pessoa</th>
               <th>Forma de pagamento</th>
               <th>Banco</th>
-              <th>Lançamento</th>
               <th>Classificação2</th>
+              <th>Classificação1</th>
+              <th>Lançamento</th>
               <th>Valor</th>
             </tr>
           </thead>
@@ -133,8 +94,8 @@
     </article>
 
     <footer>
-      Fontes: Controle_gastos_Josy.xlsx · Controle_gastos_Nill.xlsx · Objetivo: ≤ R$ 500/mês por pessoa ·
-      <a href="exemplo.html" style="color: var(--accent-2); text-decoration: none">Dashboard de estudo (dados fictícios)</a>
+      Fontes: Controle_gastos_Josy.xlsx · Controle_gastos_Nill.xlsx · Objetivo: ≤ 500/mês por pessoa ·
+      <a href="exemplo.html">Dashboard de estudo (dados fictícios)</a>
     </footer>
   </div>
 

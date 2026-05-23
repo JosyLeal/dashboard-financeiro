@@ -1,20 +1,38 @@
 (function () {
   "use strict";
 
+  const THEME = {
+    muted: "#7a9ec4",
+    accent: "#00e5ff",
+    accent2: "#007bff",
+    success: "#00e5ff",
+    warning: "#ffb74d",
+    danger: "#ff5252",
+    text: "#ffffff",
+    grid: "rgba(255,255,255,0.05)",
+  };
+
   const META = window.FINANCE_META || {};
   const DATA = window.FINANCE_DATA || [];
   const GOAL = META.objetivoPorPessoa || 500;
   const COUPLE_GOAL = META.objetivoCasal || 1000;
   const PESSOAS = Object.keys(META.pessoas || { Josy: {}, Nill: {} });
-  const FILTER_COLUMNS = META.colunas || [
-    { key: "mesPagamento", label: "Mês do pagamento", tipo: "mes" },
-    { key: "formaPagamento", label: "Forma de pagamento" },
-    { key: "pessoa", label: "Pessoa" },
-    { key: "banco", label: "Banco" },
-    { key: "tipo", label: "Tipo de lançamento" },
-    { key: "classificacao1", label: "Classificação1" },
-    { key: "classificacao2", label: "Classificação2" },
-  ];
+  const FILTER_COLUMNS = (() => {
+    const cols = META.colunas || [
+      { key: "mesPagamento", label: "Mês do pagamento", tipo: "mes" },
+      { key: "formaPagamento", label: "Forma de pagamento" },
+      { key: "pessoa", label: "Pessoa" },
+      { key: "banco", label: "Banco" },
+      { key: "tipo", label: "Tipo de lançamento" },
+      { key: "classificacao1", label: "Classificação1" },
+      { key: "classificacao2", label: "Classificação2" },
+    ];
+    if (cols.some((c) => c.key === "ano")) return cols;
+    const mesIdx = cols.findIndex((c) => c.key === "mesPagamento");
+    const anoCol = { key: "ano", label: "Ano", tipo: "ano", virtual: true };
+    if (mesIdx >= 0) return [...cols.slice(0, mesIdx), anoCol, ...cols.slice(mesIdx)];
+    return [anoCol, ...cols];
+  })();
   const DEFAULT_FILTERS = META.filtrosPadrao || {
     formaPagamento: "Crédito",
     tipo: "Saída",
@@ -43,6 +61,25 @@
 
   const NAO_CLASSIFICADO = "Não classificado";
 
+  const ALLOWED_CLASSIFICACAO2 = [
+    "Despesas Extra",
+    "Ativos - Bens Duráveis",
+    "Uber/99",
+    "Restaurante/Lanche",
+    "Poupança/Investimentos",
+    "Parcelamento Fatura",
+    "Outros",
+    "Despesas Extra - Reembolsada",
+    "Transporte Público",
+    "Assinaturas",
+    "Igreja",
+    "Saúde",
+    "Estudos - PDI",
+    "Taxas - Banco",
+    "Mercado/Feira",
+  ];
+  const ALLOWED_CLASSIFICACAO2_SET = new Set(ALLOWED_CLASSIFICACAO2);
+
   function isExcelError(value) {
     if (value == null || value === "") return false;
     const s = String(value).trim().toUpperCase();
@@ -55,15 +92,25 @@
     return String(value).trim();
   }
 
-  function classificacao2Label(r) {
-    return normalizeClassificacao(r.classificacao2) || normalizeClassificacao(r.classificacao1) || "Sem categoria";
+  function classificacao2Only(r) {
+    return normalizeClassificacao(r.classificacao2) || NAO_CLASSIFICADO;
   }
 
-  const fmt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+  function isAllowedClassificacao2(r) {
+    return ALLOWED_CLASSIFICACAO2_SET.has(classificacao2Only(r));
+  }
+
   const fmtMonth = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" });
 
-  let trendChart;
-  let categoryChart;
+  function fmtVal(value) {
+    const n = Math.round(Number(value));
+    if (value == null || Number.isNaN(n)) return "—";
+    return new Intl.NumberFormat("pt-BR", {
+      maximumFractionDigits: 0,
+      minimumFractionDigits: 0,
+    }).format(n);
+  }
+
   let coupleChart;
   let coupleCategoryChart;
   let personSplitChart;
@@ -76,7 +123,7 @@
   }
 
   function baseRows() {
-    return DATA.filter((r) => r.formaPagamento !== "Total");
+    return DATA.filter((r) => r.formaPagamento !== "Total" && isAllowedClassificacao2(r));
   }
 
   function monthLabel(ym) {
@@ -84,8 +131,20 @@
     return fmtMonth.format(new Date(y, m - 1, 1));
   }
 
+  function rowYear(row) {
+    if (!row.mesPagamento) return "";
+    return String(row.mesPagamento).slice(0, 4);
+  }
+
+  function filterCellValue(row, col) {
+    if (col.key === "ano") return rowYear(row);
+    if (col.key === "classificacao1") return normalizeClassificacao(row.classificacao1);
+    if (col.key === "classificacao2") return normalizeClassificacao(row.classificacao2);
+    return row[col.key];
+  }
+
   function personColor(pessoa) {
-    return META.pessoas?.[pessoa]?.cor || "#5b8def";
+    return META.pessoas?.[pessoa]?.cor || THEME.accent2;
   }
 
   function personLabel(pessoa) {
@@ -105,22 +164,29 @@
     if (value <= GOAL) {
       return {
         cls: "status-ok",
+        emoji: "✅",
         label: "Na meta",
-        msg: `Dentro do objetivo — sobram ${fmt.format(GOAL - value)} até o teto.`,
+        msg: `Dentro do objetivo — sobram ${fmtVal(GOAL - value)} até o teto.`,
       };
     }
     if (value <= GOAL * 1.5) {
       return {
         cls: "status-warn",
+        emoji: "⚠️",
         label: "Atenção",
-        msg: `Acima da meta em ${fmt.format(value - GOAL)}. Corte despesas ajustáveis.`,
+        msg: `Acima da meta em ${fmtVal(value - GOAL)}. Corte despesas ajustáveis.`,
       };
     }
     return {
       cls: "status-danger",
+      emoji: "🚨",
       label: "Crítico",
-      msg: `Muito acima da meta (+${fmt.format(value - GOAL)}). Revisão urgente.`,
+      msg: `Muito acima da meta (+${fmtVal(value - GOAL)}). Revisão urgente.`,
     };
+  }
+
+  function statusBadge(info) {
+    return `<span class="status-pill ${info.cls}"><span class="status-emoji">${info.emoji}</span> ${info.label}</span>`;
   }
 
   function sumBy(rows, keyFn) {
@@ -137,6 +203,24 @@
     FILTER_COLUMNS.forEach((col) => {
       if (col.origem === "arquivo") {
         values[col.key] = PESSOAS.slice();
+        return;
+      }
+      if (col.key === "classificacao2") {
+        values[col.key] = ALLOWED_CLASSIFICACAO2.slice();
+        return;
+      }
+      if (col.key === "ano") {
+        const rows = applyFilters(baseRows(), col.key);
+        values[col.key] = [...new Set(rows.map(rowYear).filter(Boolean))].sort((a, b) => b.localeCompare(a));
+        return;
+      }
+      if (col.tipo === "mes") {
+        const rows = applyFilters(baseRows(), col.key);
+        let months = [...new Set(rows.map((r) => r.mesPagamento).filter(Boolean))].sort();
+        if (activeFilters.ano) {
+          months = months.filter((m) => m.startsWith(`${activeFilters.ano}-`));
+        }
+        values[col.key] = months;
         return;
       }
       const rows = applyFilters(baseRows(), col.key);
@@ -159,10 +243,7 @@
         if (col.key === excludeKey) return true;
         const selected = activeFilters[col.key];
         if (!selected) return true;
-        let cell = row[col.key];
-        if (col.key === "classificacao1") cell = normalizeClassificacao(row.classificacao1);
-        if (col.key === "classificacao2") cell = normalizeClassificacao(row.classificacao2);
-        return String(cell) === selected;
+        return String(filterCellValue(row, col)) === selected;
       })
     );
   }
@@ -188,6 +269,9 @@
         const def = DEFAULT_FILTERS[col.key];
         activeFilters[col.key] = def != null ? def : "";
       });
+      const years = [...new Set(baseRows().map(rowYear).filter(Boolean))].sort((a, b) => b.localeCompare(a));
+      const now = String(new Date().getFullYear());
+      activeFilters.ano = years.includes(now) ? now : years[0] || "";
     }
 
     const options = getFilterValues();
@@ -203,6 +287,7 @@
         `<option value="">Todos</option>`,
         ...opts.map((v) => {
           let label = col.tipo === "mes" ? monthLabel(v) : v;
+          if (col.tipo === "ano") label = v;
           if (col.origem === "arquivo" && col.mapa) {
             const arquivo = Object.entries(col.mapa).find(([, nome]) => nome === v)?.[0];
             if (arquivo) label = `${v} (${arquivo.replace("Controle_gastos_", "").replace(".xlsx", "")})`;
@@ -222,11 +307,17 @@
       `;
     }).join("");
 
-    if (!activeFilters.mesPagamento) {
+    if (!preserveValues && !activeFilters.mesPagamento) {
       const months = options.mesPagamento || [];
       const now = new Date();
       const current = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-      activeFilters.mesPagamento = months.includes(current) ? current : months[months.length - 1] || "";
+      const preferred = activeFilters.ano && current.startsWith(`${activeFilters.ano}-`) ? current : "";
+      activeFilters.mesPagamento = months.includes(preferred) ? preferred : months[months.length - 1] || "";
+      const mesEl = document.getElementById("filter-mesPagamento");
+      if (mesEl && activeFilters.mesPagamento) mesEl.value = activeFilters.mesPagamento;
+    } else if (preserveValues && !activeFilters.mesPagamento) {
+      const months = options.mesPagamento || [];
+      activeFilters.mesPagamento = months[months.length - 1] || "";
       const mesEl = document.getElementById("filter-mesPagamento");
       if (mesEl && activeFilters.mesPagamento) mesEl.value = activeFilters.mesPagamento;
     }
@@ -261,10 +352,11 @@
 
     if (!showGoal) {
       card.innerHTML = `
-        <h3>${personLabel(pessoa)}</h3>
-        <p class="subtitle">Total filtrado no mês · ${escapeHtml(activeFilters.formaPagamento || "Todas as formas")}</p>
-        <div class="kpi-value" style="color:${personColor(pessoa)}">${fmt.format(total)}</div>
-        <div class="kpi-meta">Meta de R$ 500 aplica-se a gastos com cartão (Crédito + Saída).</div>
+        <div class="kpi-head">
+          <h3>${personLabel(pessoa)}</h3>
+        </div>
+        <div class="kpi-value" style="color:${personColor(pessoa)}">${fmtVal(total)}</div>
+        <div class="kpi-meta">${escapeHtml(activeFilters.formaPagamento || "Todas as formas")} · meta 500 no cartão</div>
       `;
       return;
     }
@@ -273,21 +365,18 @@
     const pct = Math.min((total / GOAL) * 100, 150);
 
     card.innerHTML = `
-      <h3>${personLabel(pessoa)}</h3>
-      <p class="subtitle">Meta: ${fmt.format(GOAL)}/mês no cartão</p>
-      <div class="kpi-value" style="color:${personColor(pessoa)}">${fmt.format(total)}</div>
-      <div class="kpi-meta">${info.msg}</div>
-      <span class="status-pill ${info.cls}">${info.label}</span>
+      <div class="kpi-head">
+        <h3>${personLabel(pessoa)}</h3>
+        ${statusBadge(info)}
+      </div>
+      <div class="kpi-value" style="color:${personColor(pessoa)}">${fmtVal(total)}</div>
+      <div class="kpi-meta">${info.emoji} ${info.msg}</div>
       <div class="progress-wrap ${cssClass}">
-        <div class="progress-label">
-          <span>R$ 0</span>
-          <span>Meta ${fmt.format(GOAL)}</span>
-          <span>${fmt.format(Math.max(total, GOAL * 1.2))}</span>
-        </div>
         <div class="progress-bar">
           <div class="progress-marker" style="left: ${Math.min(100 / 1.5, 66)}%"></div>
           <div class="progress-fill" style="width: ${Math.min(pct / 1.5, 100)}%"></div>
         </div>
+        <div class="progress-caption">Meta ${fmtVal(GOAL)}</div>
       </div>
     `;
   }
@@ -302,27 +391,23 @@
 
   function renderSummaryStrip(rows) {
     const pessoas = visiblePessoas();
-    const totals = pessoas.map((p) => ({ p, v: personTotal(rows, p) }));
-    const total = totals.reduce((s, x) => s + x.v, 0);
+    const total = pessoas.reduce((s, p) => s + personTotal(rows, p), 0);
     const showGoal = isCreditGoalContext();
     const excess = showGoal ? Math.max(0, total - COUPLE_GOAL) : 0;
+    const month = activeFilters.mesPagamento ? monthLabel(activeFilters.mesPagamento) : "Período filtrado";
 
     const items = [
-      `<div class="strip-item"><span>Total no mês</span><strong>${fmt.format(total)}</strong></div>`,
-      ...totals.map(
-        ({ p, v }) =>
-          `<div class="strip-item"><span>${personLabel(p)}</span><strong style="color:${personColor(p)}">${fmt.format(v)}</strong></div>`
-      ),
+      `<div class="strip-item strip-highlight"><span>${escapeHtml(month)}</span><strong>${fmtVal(total)}</strong></div>`,
     ];
 
     if (showGoal && pessoas.length > 1) {
       items.push(
-        `<div class="strip-item"><span>Meta do casal</span><strong>${fmt.format(COUPLE_GOAL)}</strong></div>`,
-        `<div class="strip-item"><span>Excedente</span><strong style="color:${excess > 0 ? "var(--danger)" : "var(--success)"}">${fmt.format(excess)}</strong></div>`
+        `<div class="strip-item"><span>Meta casal</span><strong>${fmtVal(COUPLE_GOAL)}</strong></div>`,
+        `<div class="strip-item"><span>Excedente</span><strong style="color:${excess > 0 ? "var(--danger)" : "var(--success)"}">${fmtVal(excess)}</strong></div>`
       );
     }
 
-    items.push(`<div class="strip-item"><span>Registros</span><strong>${rows.length}</strong></div>`);
+    items.push(`<div class="strip-item"><span>Lançamentos</span><strong>${rows.length}</strong></div>`);
     document.getElementById("summaryStrip").innerHTML = items.join("");
   }
 
@@ -335,29 +420,29 @@
       const total = pessoas.reduce((s, p) => s + personTotal(rows, p), 0);
       if (pessoas.length > 1) {
         if (total <= COUPLE_GOAL) {
-          parts.push(`O casal está <strong>dentro da meta combinada</strong> de ${fmt.format(COUPLE_GOAL)} em cartão.`);
+          parts.push(`O casal está <strong>dentro da meta combinada</strong> de ${fmtVal(COUPLE_GOAL)} em cartão.`);
         } else {
-          parts.push(`Para atingir a meta, o casal precisa reduzir <strong>${fmt.format(total - COUPLE_GOAL)}</strong> neste mês.`);
+          parts.push(`Para atingir a meta, o casal precisa reduzir <strong>${fmtVal(total - COUPLE_GOAL)}</strong> neste mês.`);
         }
       }
 
       pessoas.forEach((p) => {
         const v = personTotal(rows, p);
-        if (v > GOAL) parts.push(`${personLabel(p)}: cortar <strong>${fmt.format(v - GOAL)}</strong>.`);
-        else if (v > 0) parts.push(`${personLabel(p)}: <strong>${fmt.format(GOAL - v)}</strong> abaixo da meta.`);
+        if (v > GOAL) parts.push(`${personLabel(p)}: cortar <strong>${fmtVal(v - GOAL)}</strong>.`);
+        else if (v > 0) parts.push(`${personLabel(p)}: <strong>${fmtVal(GOAL - v)}</strong> abaixo da meta.`);
       });
     } else {
-      parts.push(`Visualizando filtros ativos da planilha. Meta de R$ 500 vale para <strong>Crédito + Saída</strong>.`);
+      parts.push(`Visualizando filtros ativos da planilha. Meta de 500 vale para <strong>Crédito + Saída</strong>.`);
     }
 
-    const activeLabels = FILTER_COLUMNS.filter((c) => activeFilters[c.key])
-      .map((c) => `<strong>${c.label}</strong>: ${c.tipo === "mes" ? monthLabel(activeFilters[c.key]) : activeFilters[c.key]}`)
+    const activeLabels = FILTER_COLUMNS.filter((c) => activeFilters[c.key] && c.key !== "mesPagamento")
+      .map((c) => `${c.label}: ${activeFilters[c.key]}`)
       .join(" · ");
-    if (activeLabels) parts.push(`Filtros: ${activeLabels}.`);
+    if (activeLabels) parts.push(`<span style="color:var(--muted)">${activeLabels}</span>`);
 
-    const catMap = sumBy(rows, classificacao2Label);
+    const catMap = sumBy(rows, classificacao2Only);
     const topCat = Object.entries(catMap).sort((a, b) => b[1] - a[1])[0];
-    if (topCat) parts.push(`Maior Classificação2: <strong>${topCat[0]}</strong> (${fmt.format(topCat[1])}).`);
+    if (topCat) parts.push(`Maior gasto: <strong>${topCat[0]}</strong> (${fmtVal(topCat[1])}).`);
 
     document.getElementById("insightBox").innerHTML = parts.join(" ");
   }
@@ -365,7 +450,7 @@
   function getTopCategoriesByPerson(rows, limit = 10) {
     const catMap = {};
     rows.forEach((r) => {
-      const cat = classificacao2Label(r);
+      const cat = classificacao2Only(r);
       if (!catMap[cat]) catMap[cat] = { total: 0 };
       PESSOAS.forEach((p) => {
         if (!catMap[cat][p]) catMap[cat][p] = 0;
@@ -396,22 +481,61 @@
         })),
       },
       options: {
-        ...chartOptions("Classificação2 (R$)"),
+        ...chartOptions("Classificação2"),
+        layout: { padding: { right: 48 } },
         indexAxis: "y",
         scales: {
           x: {
             stacked: true,
-            ticks: { color: "#8fa3bc", callback: (v) => fmt.format(v) },
-            grid: { color: "rgba(255,255,255,0.05)" },
+            ticks: { color: THEME.muted, callback: (v) => fmtVal(v) },
+            grid: { color: THEME.grid },
           },
-          y: { stacked: true, ticks: { color: "#8fa3bc" }, grid: { display: false } },
+          y: { stacked: true, ticks: { color: THEME.muted }, grid: { display: false } },
         },
         plugins: {
-          legend: { labels: { color: "#8fa3bc" } },
+          legend: { labels: { color: THEME.muted } },
+          datalabels: {
+            clip: false,
+            color: (ctx) => {
+              const bar = ctx.chart.getDatasetMeta(ctx.datasetIndex).data[ctx.dataIndex];
+              const v = ctx.dataset.data[ctx.dataIndex];
+              return v && bar && Math.abs(bar.width) > 32 ? THEME.text : THEME.muted;
+            },
+            font: { size: 10, weight: "600" },
+            anchor: (ctx) => {
+              const bar = ctx.chart.getDatasetMeta(ctx.datasetIndex).data[ctx.dataIndex];
+              const v = ctx.dataset.data[ctx.dataIndex];
+              return v && bar && Math.abs(bar.width) > 32 ? "center" : "end";
+            },
+            align: (ctx) => {
+              const bar = ctx.chart.getDatasetMeta(ctx.datasetIndex).data[ctx.dataIndex];
+              const v = ctx.dataset.data[ctx.dataIndex];
+              return v && bar && Math.abs(bar.width) > 32 ? "center" : "end";
+            },
+            offset: 6,
+            formatter: (value, ctx) => {
+              const bar = ctx.chart.getDatasetMeta(ctx.datasetIndex).data[ctx.dataIndex];
+              if (value && bar && Math.abs(bar.width) > 32) return fmtVal(value);
+              if (ctx.datasetIndex === ctx.chart.data.datasets.length - 1) {
+                const total = ctx.chart.data.datasets.reduce(
+                  (s, ds) => s + (Number(ds.data[ctx.dataIndex]) || 0),
+                  0
+                );
+                return total ? fmtVal(total) : "";
+              }
+              return "";
+            },
+            display: (ctx) => {
+              const value = ctx.dataset.data[ctx.dataIndex];
+              const bar = ctx.chart.getDatasetMeta(ctx.datasetIndex).data[ctx.dataIndex];
+              if (value && bar && Math.abs(bar.width) > 32) return true;
+              return ctx.datasetIndex === ctx.chart.data.datasets.length - 1;
+            },
+          },
           tooltip: {
             callbacks: {
-              label: (ctx) => `${ctx.dataset.label}: ${fmt.format(ctx.raw)}`,
-              footer: (items) => `Total: ${fmt.format(items.reduce((s, i) => s + i.raw, 0))}`,
+              label: (ctx) => `${ctx.dataset.label}: ${fmtVal(ctx.raw)}`,
+              footer: (items) => `Total: ${fmtVal(items.reduce((s, i) => s + i.raw, 0))}`,
             },
           },
         },
@@ -420,17 +544,18 @@
   }
 
   function renderPersonSplitChart(rows) {
-    const top = getTopCategoriesByPerson(rows, 8);
+    const pessoas = visiblePessoas();
+    const totals = pessoas.map((p) => ({ p, v: personTotal(rows, p) })).filter(({ v }) => v > 0);
     const ctx = document.getElementById("personSplitChart");
     if (personSplitChart) personSplitChart.destroy();
 
     personSplitChart = new Chart(ctx, {
       type: "doughnut",
       data: {
-        labels: top.map(([cat]) => cat),
+        labels: totals.map(({ p }) => (p === "Nill" ? "Gastos do Nill" : "Gastos de Josy")),
         datasets: [{
-          data: top.map(([, v]) => v.total),
-          backgroundColor: top.map((_, i) => `hsla(${160 + i * 22}, 60%, 52%, 0.9)`),
+          data: totals.map(({ v }) => v),
+          backgroundColor: totals.map(({ p }) => personColor(p) + "e6"),
           borderWidth: 0,
         }],
       },
@@ -438,13 +563,27 @@
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { position: "right", labels: { color: "#8fa3bc", boxWidth: 12, font: { size: 11 } } },
+          legend: { position: "right", labels: { color: THEME.muted, boxWidth: 12, font: { size: 11 } } },
+          datalabels: {
+            display: true,
+            clip: false,
+            color: THEME.text,
+            font: { size: 12, weight: "700" },
+            anchor: "center",
+            align: "center",
+            textAlign: "center",
+            formatter: (value, ctx) => {
+              const total = ctx.chart.data.datasets[0].data.reduce((s, v) => s + v, 0);
+              const pct = total ? Math.round((value / total) * 100) : 0;
+              return `${fmtVal(value)}\n${pct}%`;
+            },
+          },
           tooltip: {
             callbacks: {
               label: (ctx) => {
-                const total = rows.reduce((s, r) => s + r.valorAbs, 0);
+                const total = ctx.chart.data.datasets[0].data.reduce((s, v) => s + v, 0);
                 const pct = total ? ((ctx.raw / total) * 100).toFixed(1) : 0;
-                return `${ctx.label}: ${fmt.format(ctx.raw)} (${pct}%)`;
+                return `${ctx.label}: ${fmtVal(ctx.raw)} (${pct}%)`;
               },
             },
           },
@@ -453,41 +592,8 @@
     });
   }
 
-  function renderCategoryTable(rows) {
-    const top = getTopCategoriesByPerson(rows, 15);
-    const totalGeral = rows.reduce((s, r) => s + r.valorAbs, 0);
-    const pessoas = visiblePessoas();
-    const thead = document.querySelector("#catTable thead tr");
-
-    thead.innerHTML = `
-      <th>Classificação2</th>
-      ${pessoas.map((p) => `<th>${personLabel(p)}</th>`).join("")}
-      <th>Total</th>
-      <th>% do mês</th>
-    `;
-
-    document.querySelector("#catTable tbody").innerHTML = top
-      .map(([cat, v]) => {
-        const pct = totalGeral ? ((v.total / totalGeral) * 100).toFixed(1) : 0;
-        return `
-          <tr>
-            <td>${cat}</td>
-            ${pessoas
-              .map((p) => {
-                const cls = p === "Josy" ? "person-josy-cell" : "person-nill-cell";
-                return `<td class="amount ${cls}">${fmt.format(v[p] || 0)}</td>`;
-              })
-              .join("")}
-            <td class="amount"><strong>${fmt.format(v.total)}</strong></td>
-            <td class="amount">${pct}%</td>
-          </tr>
-        `;
-      })
-      .join("");
-  }
-
   function renderOpportunities(rows) {
-    const catMap = sumBy(rows, classificacao2Label);
+    const catMap = sumBy(rows, classificacao2Only);
     const total = rows.reduce((s, r) => s + r.valorAbs, 0);
     const items = Object.entries(catMap)
       .filter(([cat]) => REDUCTION_MAP[cat])
@@ -510,7 +616,7 @@
               <div class="cat-name">${cat}</div>
               <div class="cat-tip">${meta.dica}</div>
             </div>
-            <div class="cat-value">${fmt.format(val)}</div>
+            <div class="cat-value">${fmtVal(val)}</div>
             <div class="cat-pct">${pct}%</div>
           </div>
         `;
@@ -519,8 +625,8 @@
   }
 
   function renderTransactions(rows) {
-    const top = [...rows].sort((a, b) => b.valorAbs - a.valorAbs).slice(0, 15);
-    document.querySelector("#txTable tbody").innerHTML = top
+    const sorted = [...rows].sort((a, b) => b.valorAbs - a.valorAbs);
+    document.querySelector("#txTable tbody").innerHTML = sorted
       .map(
         (r) => `
       <tr>
@@ -528,120 +634,67 @@
         <td><span class="person-tag person-tag-${r.pessoa?.toLowerCase()}">${personLabel(r.pessoa)}</span></td>
         <td>${r.formaPagamento || "—"}</td>
         <td>${r.banco || "—"}</td>
+        <td>${classificacao2Only(r)}</td>
+        <td>${normalizeClassificacao(r.classificacao1) || "—"}</td>
         <td>${r.lancamento}</td>
-        <td>${classificacao2Label(r)}</td>
-        <td class="amount">${fmt.format(r.valorAbs)}</td>
+        <td class="amount">${fmtVal(r.valorAbs)}</td>
       </tr>
     `
       )
       .join("");
   }
 
-  function renderTrendChart(allFiltered) {
-    const months = [...new Set(allFiltered.map((r) => r.mesPagamento))].sort();
-    const pessoas = visiblePessoas();
-    const showGoal = isCreditGoalContext();
-    const ctx = document.getElementById("trendChart");
-    if (trendChart) trendChart.destroy();
-
-    const datasets = pessoas.map((p) => ({
-      label: personLabel(p),
-      data: months.map((m) => personTotal(allFiltered.filter((r) => r.mesPagamento === m), p)),
-      borderColor: personColor(p),
-      backgroundColor: personColor(p) + "22",
-      tension: 0.3,
-      fill: true,
-    }));
-
-    if (showGoal) {
-      datasets.push(
-        {
-          label: `Meta/pessoa (${fmt.format(GOAL)})`,
-          data: months.map(() => GOAL),
-          borderColor: "#3dd6b5",
-          borderDash: [6, 4],
-          pointRadius: 0,
-          fill: false,
-        },
-        {
-          label: `Meta casal (${fmt.format(COUPLE_GOAL)})`,
-          data: months.map(() => COUPLE_GOAL),
-          borderColor: "#5b8def",
-          borderDash: [2, 4],
-          pointRadius: 0,
-          fill: false,
-        }
-      );
-    }
-
-    trendChart = new Chart(ctx, {
-      type: "line",
-      data: { labels: months.map(monthLabel), datasets },
-      options: chartOptions("Evolução mensal (R$)"),
-    });
-  }
-
-  function renderCategoryChart(rows) {
-    const catMap = sumBy(rows, classificacao2Label);
-    const sorted = Object.entries(catMap).sort((a, b) => b[1] - a[1]).slice(0, 10);
-    const ctx = document.getElementById("categoryChart");
-    if (categoryChart) categoryChart.destroy();
-
-    categoryChart = new Chart(ctx, {
-      type: "bar",
-      data: {
-        labels: sorted.map(([c]) => c),
-        datasets: [{
-          label: "Total",
-          data: sorted.map(([, v]) => v),
-          backgroundColor: sorted.map((_, i) => `hsla(${170 + i * 18}, 65%, 52%, 0.85)`),
-          borderRadius: 6,
-        }],
-      },
-      options: {
-        ...chartOptions("Classificação2 (R$)"),
-        indexAxis: "y",
-        plugins: { legend: { display: false } },
-      },
-    });
-  }
-
-  function renderCoupleChart(allFiltered) {
-    const month = activeFilters.mesPagamento;
-    const months = [...new Set(allFiltered.map((r) => r.mesPagamento))].sort();
-    const idx = Math.max(0, months.indexOf(month) - 5);
-    const slice = months.slice(idx, months.indexOf(month) + 1);
-    const showGoal = isCreditGoalContext();
+  function renderCoupleChart() {
+    const rows = applyFilters(baseRows(), "mesPagamento");
+    const months = [...new Set(rows.map((r) => r.mesPagamento))].sort();
     const ctx = document.getElementById("coupleChart");
     if (coupleChart) coupleChart.destroy();
 
-    const totals = slice.map((m) => allFiltered.filter((r) => r.mesPagamento === m).reduce((s, r) => s + r.valorAbs, 0));
+    if (!months.length) return;
 
-    const datasets = [{
-      label: "Total filtrado",
-      data: totals,
-      backgroundColor: showGoal
-        ? totals.map((v) => (v <= COUPLE_GOAL ? "rgba(76,175,135,0.8)" : v <= COUPLE_GOAL * 1.5 ? "rgba(245,166,35,0.85)" : "rgba(239,83,80,0.85)"))
-        : "rgba(91,141,239,0.75)",
-      borderRadius: 8,
-    }];
-
-    if (showGoal) {
-      datasets.push({
-        label: "Meta casal",
-        data: slice.map(() => COUPLE_GOAL),
-        type: "line",
-        borderColor: "#3dd6b5",
-        borderDash: [5, 5],
-        pointRadius: 0,
-        fill: false,
-      });
-    }
+    const totals = months.map((m) =>
+      rows.filter((r) => r.mesPagamento === m).reduce((s, r) => s + r.valorAbs, 0)
+    );
 
     coupleChart = new Chart(ctx, {
-      type: "bar",
-      data: { labels: slice.map(monthLabel), datasets },
-      options: chartOptions("Total mensal (R$)"),
+      type: "line",
+      data: {
+        labels: months.map(monthLabel),
+        datasets: [
+          {
+            label: "Gasto real",
+            data: totals,
+            borderColor: THEME.accent2,
+            backgroundColor: "rgba(0, 123, 255, 0.12)",
+            tension: 0.3,
+            fill: true,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            pointBackgroundColor: totals.map((v) =>
+              v <= COUPLE_GOAL ? THEME.success : v <= COUPLE_GOAL * 1.5 ? THEME.warning : THEME.danger
+            ),
+          },
+          {
+            label: `Meta (${fmtVal(COUPLE_GOAL)})`,
+            data: months.map(() => COUPLE_GOAL),
+            borderColor: THEME.accent,
+            borderDash: [6, 4],
+            pointRadius: 0,
+            fill: false,
+          },
+        ],
+      },
+      options: {
+        ...chartOptions("Valor mensal"),
+        scales: {
+          x: { ticks: { color: THEME.muted, maxRotation: 45 }, grid: { color: THEME.grid } },
+          y: {
+            ticks: { color: THEME.muted, callback: (v) => fmtVal(v) },
+            grid: { color: THEME.grid },
+            title: { display: true, text: "Valor mensal", color: THEME.muted },
+          },
+        },
+      },
     });
   }
 
@@ -651,17 +704,17 @@
       maintainAspectRatio: false,
       interaction: { mode: "index", intersect: false },
       plugins: {
-        legend: { labels: { color: "#8fa3bc", boxWidth: 12 } },
+        legend: { labels: { color: THEME.muted, boxWidth: 12 } },
         tooltip: {
-          callbacks: { label: (ctx) => `${ctx.dataset.label}: ${fmt.format(ctx.raw)}` },
+          callbacks: { label: (ctx) => `${ctx.dataset.label}: ${fmtVal(ctx.raw)}` },
         },
       },
       scales: {
-        x: { ticks: { color: "#8fa3bc", maxRotation: 45 }, grid: { color: "rgba(255,255,255,0.05)" } },
+        x: { ticks: { color: THEME.muted, maxRotation: 45 }, grid: { color: THEME.grid } },
         y: {
-          ticks: { color: "#8fa3bc", callback: (v) => fmt.format(v) },
-          grid: { color: "rgba(255,255,255,0.05)" },
-          title: { display: !!yTitle, text: yTitle, color: "#8fa3bc" },
+          ticks: { color: THEME.muted, callback: (v) => fmtVal(v) },
+          grid: { color: THEME.grid },
+          title: { display: !!yTitle, text: yTitle, color: THEME.muted },
         },
       },
     };
@@ -681,18 +734,20 @@
     renderInsight(monthRows);
     renderOpportunities(monthRows);
     renderTransactions(monthRows);
-    renderCategoryChart(monthRows);
-    renderCoupleChart(allFiltered);
+    renderCoupleChart();
     renderCoupleCategoryChart(monthRows);
     renderPersonSplitChart(monthRows);
-    renderCategoryTable(monthRows);
-    renderTrendChart(allFiltered);
   }
 
   function init() {
     if (!DATA.length) {
       document.body.innerHTML = "<p style='padding:40px;color:#fff'>Dados não carregados. Execute scripts/export-data.js</p>";
       return;
+    }
+
+    if (typeof ChartDataLabels !== "undefined") {
+      Chart.register(ChartDataLabels);
+      Chart.defaults.set("plugins.datalabels", { display: false });
     }
 
     DATA.forEach((r) => {
