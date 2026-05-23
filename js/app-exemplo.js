@@ -257,11 +257,10 @@
       "negative",
       showGoal
         ? `<span class="status-pill ${info.cls}">${info.label}</span>
-           <div class="progress-wrap">
+           <div class="progress-wrap progress-exemplo">
              <div class="progress-label"><span>R$ 0</span><span>Meta ${fmt.format(GOAL)}</span></div>
              <div class="progress-bar">
-               <div class="progress-marker" style="left:66%"></div>
-               <div class="progress-fill" style="width:${Math.min(pct / 1.5, 100)}%;background:linear-gradient(90deg,var(--danger),#ff8a80)"></div>
+               <div class="progress-fill progress-fill-despesa" style="width:${Math.min(pct / 1.5, 100)}%"></div>
              </div>
            </div>`
         : `<div class="kpi-meta">Meta de R$ 3.500 aplica-se a despesas totais.</div>`

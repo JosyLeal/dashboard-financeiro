@@ -92,3 +92,13 @@ footer a {
 footer a:hover {
   text-decoration: underline;
 }
+
+/* Barra de meta sem animação (evita efeito de “deslizando”) */
+.progress-exemplo .progress-fill {
+  transition: none;
+  background: linear-gradient(90deg, var(--danger), #ff8a80);
+}
+
+.progress-exemplo .progress-marker {
+  display: none;
+}
